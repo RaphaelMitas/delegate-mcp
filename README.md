@@ -88,7 +88,7 @@ Precedence: per-job tool arguments > environment variables > `~/.config/delegate
 | `timeoutSeconds` | `DELEGATE_TIMEOUT_SECONDS`  | `1800`                                        |
 | `stallSeconds`   | `DELEGATE_STALL_SECONDS`    | `120`                                         |
 | `permissionMode` | `DELEGATE_PERMISSION_MODE`  | `acceptEdits`                                 |
-| `maxTurns`       | `DELEGATE_MAX_TURNS`        | `50`                                          |
+| `maxTurns`       | `DELEGATE_MAX_TURNS`        | `200`                                         |
 | `concurrency`    | `DELEGATE_CONCURRENCY`      | `1`                                           |
 | `port`           | `DELEGATE_PORT`             | `0` (random)                                  |
 

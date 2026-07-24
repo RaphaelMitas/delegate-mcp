@@ -1,6 +1,6 @@
 {
   "name": "delegate-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Delegate agentic coding tasks from Claude Code to a local model (LM Studio or any Anthropic-compatible endpoint) via an observable local job daemon with MCP tools and a menu-bar UI.",
   "license": "MIT",
   "repository": {

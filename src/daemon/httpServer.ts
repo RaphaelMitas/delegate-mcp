@@ -1,7 +1,13 @@
 import http from "node:http";
 import { z } from "zod";
 
-import type { DelegateConfig } from "../shared/config.js";
+import {
+  fileConfigSchema,
+  loadConfig,
+  readConfigFile,
+  saveConfigFile,
+  type DelegateConfig,
+} from "../shared/config.js";
 import type {
   HealthResponse,
   ServerEvent,
@@ -98,7 +104,7 @@ export function createDaemonServer(
       "access-control-allow-headers",
       "authorization, content-type",
     );
-    res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    res.setHeader("access-control-allow-methods", "GET, POST, PUT, OPTIONS");
     if (method === "OPTIONS") {
       res.writeHead(204);
       res.end();
@@ -143,6 +149,29 @@ export function createDaemonServer(
       const request: StartJobRequest = parsed.data;
       const job = await manager.startJob(request);
       sendJson(res, 201, { job: manager.toSummary(job) });
+      return;
+    }
+
+    if (method === "GET" && url.pathname === "/config") {
+      const file = readConfigFile();
+      const effective = loadConfig();
+      sendJson(res, 200, { file, effective });
+      return;
+    }
+
+    if (method === "PUT" && url.pathname === "/config") {
+      const parsed = fileConfigSchema.safeParse(await readBody(req));
+      if (!parsed.success) {
+        sendJson(res, 400, {
+          error: parsed.error.issues
+            .map((i) => `${i.path.join(".")}: ${i.message}`)
+            .join("; "),
+        });
+        return;
+      }
+      const saved = saveConfigFile(parsed.data);
+      Object.assign(config, loadConfig());
+      sendJson(res, 200, { file: saved, effective: config });
       return;
     }
 

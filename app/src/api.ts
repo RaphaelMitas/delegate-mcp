@@ -8,6 +8,31 @@ export interface RuntimeInfo {
   startedAt: string;
 }
 
+export interface DaemonFileConfig {
+  baseUrl?: string;
+  model?: string;
+  permissionMode?: "default" | "acceptEdits" | "plan" | "bypassPermissions";
+  stallSeconds?: number;
+  timeoutSeconds?: number;
+  maxTurns?: number;
+}
+
+export interface DaemonConfigResponse {
+  file: DaemonFileConfig;
+  effective: DaemonFileConfig &
+    Required<
+      Pick<
+        DaemonFileConfig,
+        | "baseUrl"
+        | "model"
+        | "permissionMode"
+        | "stallSeconds"
+        | "timeoutSeconds"
+        | "maxTurns"
+      >
+    >;
+}
+
 export interface BackendHealth {
   baseUrl: string;
   reachable: boolean;
@@ -160,4 +185,26 @@ export function subscribeEvents(
   return () => {
     source.close();
   };
+}
+
+export async function fetchConfig(
+  runtime: RuntimeInfo,
+): Promise<DaemonConfigResponse> {
+  return get<DaemonConfigResponse>(runtime, "/config");
+}
+
+export async function saveConfig(
+  runtime: RuntimeInfo,
+  patch: DaemonFileConfig,
+): Promise<DaemonConfigResponse> {
+  const response = await fetch(`${base(runtime)}/config`, {
+    method: "PUT",
+    headers: {
+      authorization: `Bearer ${runtime.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) throw new Error(`config: ${response.status}`);
+  return await response.json();
 }

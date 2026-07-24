@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 
 import { configFilePath } from "./paths.js";
@@ -29,6 +30,8 @@ const fileConfigSchema = z
 
 export type FileConfig = z.infer<typeof fileConfigSchema>;
 
+export { fileConfigSchema };
+
 export interface DelegateConfig {
   baseUrl: string;
   authToken: string;
@@ -55,7 +58,7 @@ export const CONFIG_DEFAULTS: DelegateConfig = {
   timeoutSeconds: 1800,
   stallSeconds: 120,
   permissionMode: "acceptEdits",
-  maxTurns: 50,
+  maxTurns: 200,
   concurrency: 1,
 };
 
@@ -114,6 +117,41 @@ function envPermissionMode(
       `Environment variable ${key} must be one of ${permissionModeSchema.options.join(", ")}, got "${value}"`,
     );
   }
+  return result.data;
+}
+
+export function readConfigFile(
+  filePath: string = configFilePath(),
+): FileConfig {
+  return readFileConfig(filePath);
+}
+
+export function saveConfigFile(
+  patch: FileConfig,
+  filePath: string = configFilePath(),
+): FileConfig {
+  const existing = readFileConfig(filePath);
+  const merged: Record<string, unknown> = { ...existing, ...patch };
+  // Drop keys that are explicitly set to undefined
+  for (const key in merged) {
+    if (merged[key] === undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete merged[key];
+    }
+  }
+  const result = fileConfigSchema.safeParse(merged);
+  if (!result.success) {
+    throw new Error(
+      `Invalid config: ${result.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ")}`,
+    );
+  }
+
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(result.data, null, 2), "utf8");
+
   return result.data;
 }
 

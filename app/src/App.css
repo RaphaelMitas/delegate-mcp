@@ -87,18 +87,31 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-button {
+button,
+.icon-btn {
   font: inherit;
   padding: 3px 10px;
   border-radius: 6px;
+  cursor: pointer;
+}
+button {
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
-  cursor: pointer;
+}
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
 }
 button:hover {
   border-color: var(--accent);
 }
+.icon-btn:hover {
+  background: var(--panel);
+}
+
 button.danger {
   color: var(--bad);
 }
@@ -279,4 +292,79 @@ button.danger {
   white-space: pre-wrap;
   word-break: break-all;
   user-select: text;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.settings .settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.settings h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings form {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+.form-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.form-row label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.form-row input,
+.form-row select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.form-row input:hover,
+.form-row select:hover {
+  border-color: var(--accent);
+}
+.form-row input:focus,
+.form-row select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.form-actions button {
+  flex: 1;
+}
+.warning {
+  color: var(--bad);
+  font-size: 11px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--bad) 8%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--bad) 20%, transparent);
+}
+.success {
+  color: var(--ok);
+  font-size: 11px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ok) 20%, transparent);
 }

@@ -36,6 +36,8 @@ export function daemonLogPath(): string {
 }
 
 export function configFilePath(): string {
+  const override = process.env.DELEGATE_CONFIG_FILE;
+  if (override !== undefined && override !== "") return override;
   const xdg = process.env.XDG_CONFIG_HOME;
   return path.join(
     xdg ?? path.join(os.homedir(), ".config"),

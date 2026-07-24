@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   cancelJob,
+  fetchConfig,
   fetchHealth,
   fetchJob,
   fetchJobs,
@@ -15,6 +16,8 @@ import {
   type JobSummary,
   type RuntimeInfo,
 } from "./api.ts";
+
+import Settings from "./Settings.tsx";
 
 const STATE_LABEL: Record<JobSummary["state"], string> = {
   queued: "Queued",
@@ -46,6 +49,7 @@ export default function App() {
   const [detail, setDetail] = useState<JobRecord | null>(null);
   const [logs, setLogs] = useState<string | null>(null);
   const [daemonError, setDaemonError] = useState<string | null>(null);
+  const [view, setView] = useState<"jobs" | "settings">("jobs");
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedId;
 
@@ -159,6 +163,15 @@ export default function App() {
               "backend up")
             : "LM Studio unreachable"}
         </span>
+        <button
+          className="icon-btn"
+          aria-label="Settings"
+          onClick={() =>
+            setView((prev) => (prev === "jobs" ? "settings" : "jobs"))
+          }
+        >
+          ⚙
+        </button>
       </header>
 
       {daemonError !== null && (
@@ -168,7 +181,9 @@ export default function App() {
         </div>
       )}
 
-      {selectedId !== null && detail !== null ? (
+      {view === "settings" && runtime !== null ? (
+        <Settings runtime={runtime} onClose={() => setView("jobs")} />
+      ) : selectedId !== null && detail !== null ? (
         <JobDetail
           job={detail}
           logs={logs}

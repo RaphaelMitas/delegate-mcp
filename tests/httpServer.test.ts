@@ -14,6 +14,7 @@ import type { JobSummary } from "../src/shared/types.js";
 const TOKEN = "test-token";
 
 let dataDir: string;
+let configDir: string;
 let workdir: string;
 let server: http.Server;
 let baseUrl: string;
@@ -31,8 +32,10 @@ function api(pathname: string, init: RequestInit = {}): Promise<Response> {
 
 beforeEach(async () => {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "delegate-http-"));
+  configDir = fs.mkdtempSync(path.join(os.tmpdir(), "delegate-config-"));
   workdir = fs.mkdtempSync(path.join(os.tmpdir(), "delegate-http-work-"));
   vi.stubEnv("DELEGATE_DATA_DIR", dataDir);
+  vi.stubEnv("DELEGATE_CONFIG_FILE", path.join(configDir, "config.json"));
   callbacksList = [];
 
   const manager = new JobManager(
@@ -65,6 +68,7 @@ afterEach(async () => {
   await new Promise((resolve) => server.close(resolve));
   vi.unstubAllEnvs();
   fs.rmSync(dataDir, { recursive: true, force: true });
+  fs.rmSync(configDir, { recursive: true, force: true });
   fs.rmSync(workdir, { recursive: true, force: true });
 });
 
@@ -156,5 +160,57 @@ describe("daemon HTTP API", () => {
     });
     expect(buffer).toContain("event: job-updated");
     expect(buffer).toContain("sse job");
+  });
+
+  describe("config endpoints", () => {
+    it("GET /config returns defaults in effective when no file exists", async () => {
+      const response = await api("/config");
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        file: Record<string, unknown>;
+        effective: Record<string, unknown>;
+      };
+      expect(body.file).toEqual({});
+      expect(body.effective).toMatchObject(CONFIG_DEFAULTS);
+    });
+
+    it("PUT /config persists values and returns them in both file and effective", async () => {
+      const putResponse = await api("/config", {
+        method: "PUT",
+        body: JSON.stringify({
+          permissionMode: "bypassPermissions",
+          baseUrl: "http://127.0.0.1:9999",
+        }),
+      });
+      expect(putResponse.status).toBe(200);
+      const putBody = (await putResponse.json()) as {
+        file: Record<string, unknown>;
+        effective: Record<string, unknown>;
+      };
+      expect(putBody.file.permissionMode).toBe("bypassPermissions");
+      expect(putBody.file.baseUrl).toBe("http://127.0.0.1:9999");
+      expect(putBody.effective.permissionMode).toBe("bypassPermissions");
+      expect(putBody.effective.baseUrl).toBe("http://127.0.0.1:9999");
+
+      // Verify persistence with another GET
+      const getResponse = await api("/config");
+      expect(getResponse.status).toBe(200);
+      const getBody = (await getResponse.json()) as {
+        file: Record<string, unknown>;
+        effective: Record<string, unknown>;
+      };
+      expect(getBody.file.permissionMode).toBe("bypassPermissions");
+      expect(getBody.file.baseUrl).toBe("http://127.0.0.1:9999");
+      expect(getBody.effective.permissionMode).toBe("bypassPermissions");
+      expect(getBody.effective.baseUrl).toBe("http://127.0.0.1:9999");
+    });
+
+    it("PUT /config with invalid body returns 400", async () => {
+      const response = await api("/config", {
+        method: "PUT",
+        body: JSON.stringify({ permissionMode: "yolo" }),
+      });
+      expect(response.status).toBe(400);
+    });
   });
 });
