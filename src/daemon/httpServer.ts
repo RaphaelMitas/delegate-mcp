@@ -91,6 +91,20 @@ export function createDaemonServer(
     const url = new URL(req.url ?? "/", "http://localhost");
     const method = req.method ?? "GET";
 
+    // The daemon binds to loopback and every route requires the token; CORS
+    // is open so the menu-bar app's webview (custom origin) can call it.
+    res.setHeader("access-control-allow-origin", "*");
+    res.setHeader(
+      "access-control-allow-headers",
+      "authorization, content-type",
+    );
+    res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    if (method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     const authHeader = req.headers.authorization;
     const provided =
       authHeader?.replace(/^Bearer /, "") ?? url.searchParams.get("token");
