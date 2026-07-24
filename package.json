@@ -1,0 +1,48 @@
+{
+  "name": "delegate-mcp",
+  "version": "0.1.0",
+  "description": "Delegate agentic coding tasks from Claude Code to a local model (LM Studio or any Anthropic-compatible endpoint) via an observable local job daemon with MCP tools and a menu-bar UI.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RaphaelMitas/delegate-mcp.git"
+  },
+  "type": "module",
+  "bin": {
+    "delegate-mcp": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:daemon": "tsx src/cli/index.ts daemon --foreground",
+    "dev:mcp": "tsx src/cli/index.ts mcp",
+    "build": "tsc -p tsconfig.build.json",
+    "build:binary": "bun build --compile --target=bun-darwin-arm64 src/cli/index.ts --outfile dist/delegate-mcp",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --check \"**/*.{ts,tsx,json,md,yml}\"",
+    "format:fix": "prettier --write \"**/*.{ts,tsx,json,md,yml}\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.30.0",
+    "eslint-config-prettier": "^10.1.0",
+    "prettier": "^3.6.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^3.2.0"
+  }
+}
