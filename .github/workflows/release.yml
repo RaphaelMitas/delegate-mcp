@@ -1,0 +1,173 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag to release"
+        required: true
+        type: string
+
+jobs:
+  build-cli:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm lint && pnpm typecheck && pnpm test
+
+      - name: Build standalone binary
+        run: pnpm build:binary
+
+      - name: Package tarball
+        run: |
+          tar -czf "delegate-mcp-${{ steps.version.outputs.VERSION }}-arm64.tar.gz" -C dist delegate-mcp
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cli-release
+          path: delegate-mcp-*.tar.gz
+
+  build-app:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        working-directory: app
+        run: pnpm tauri build
+
+      - name: Import certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          echo "SIGNING_IDENTITY=$IDENTITY" >> $GITHUB_ENV
+
+      - name: Sign app
+        run: |
+          APP_PATH="app/src-tauri/target/release/bundle/macos/Delegate.app"
+          codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" "$APP_PATH"
+          codesign --verify --verbose "$APP_PATH"
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="app/src-tauri/target/release/bundle/macos/Delegate.app"
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/Delegate-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/Delegate-notarize.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$APP_PATH"
+
+      - name: Create release zip
+        run: |
+          cd app/src-tauri/target/release/bundle/macos
+          # Asset name matches the tap's update-cask.yml convention:
+          # <repo-name>-<version>.zip
+          zip -r "delegate-mcp-${{ steps.version.outputs.VERSION }}.zip" Delegate.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-release
+          path: app/src-tauri/target/release/bundle/macos/delegate-mcp-*.zip
+
+  release:
+    needs: [build-cli, build-app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: |
+            artifacts/cli-release/*
+            artifacts/app-release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew tap
+        if: ${{ env.TAP_TOKEN != '' }}
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh workflow run update-formula.yml -R RaphaelMitas/homebrew-tap \
+            -f formula_name=delegate-mcp \
+            -f release_tag="$TAG" \
+            -f source_repo=RaphaelMitas/delegate-mcp
+          gh workflow run update-cask.yml -R RaphaelMitas/homebrew-tap \
+            -f cask_name=delegate \
+            -f release_tag="$TAG" \
+            -f source_repo=RaphaelMitas/delegate-mcp
