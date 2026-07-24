@@ -8,6 +8,7 @@
     "url": "https://github.com/RaphaelMitas/delegate-mcp.git"
   },
   "type": "module",
+  "packageManager": "pnpm@10.34.4",
   "bin": {
     "delegate-mcp": "./dist/cli.js"
   },
