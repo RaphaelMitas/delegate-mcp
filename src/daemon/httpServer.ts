@@ -175,6 +175,8 @@ export function createDaemonServer(
       }
       const saved = saveConfigFile(parsed.data);
       Object.assign(config, loadConfig());
+      // A raised concurrency should start queued jobs immediately.
+      manager.kick();
       sendJson(res, 200, { file: saved, effective: config });
       return;
     }

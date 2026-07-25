@@ -39,19 +39,19 @@ beforeEach(async () => {
   vi.stubEnv("DELEGATE_CONFIG_FILE", path.join(configDir, "config.json"));
   callbacksList = [];
 
-  const manager = new JobManager(
-    { ...CONFIG_DEFAULTS, model: "test-model" },
-    {
-      resolveModel: () => Promise.resolve("test-model"),
-      startProcess: (_job, _config, callbacks) => {
-        callbacksList.push(callbacks);
-        return { pid: 42, kill: () => undefined };
-      },
+  // One shared config object for manager and server, as in production, so
+  // config updates through the API reach the running manager.
+  const sharedConfig = { ...CONFIG_DEFAULTS, model: "test-model" };
+  const manager = new JobManager(sharedConfig, {
+    resolveModel: () => Promise.resolve("test-model"),
+    startProcess: (_job, _config, callbacks) => {
+      callbacksList.push(callbacks);
+      return { pid: 42, kill: () => undefined };
     },
-  );
+  });
   shutdownSpy = vi.fn();
   server = createDaemonServer({
-    config: { ...CONFIG_DEFAULTS, model: "test-model" },
+    config: sharedConfig,
     manager,
     token: TOKEN,
     version: "0.0.0-test",
@@ -214,6 +214,28 @@ describe("daemon HTTP API", () => {
         body: JSON.stringify({ permissionMode: "yolo" }),
       });
       expect(response.status).toBe(400);
+    });
+  });
+});
+
+describe("concurrency", () => {
+  it("keeps the second job queued at concurrency 1 and starts it when raised", async () => {
+    for (const prompt of ["job one", "job two"]) {
+      const created = await api("/jobs", {
+        method: "POST",
+        body: JSON.stringify({ prompt, workdir }),
+      });
+      expect(created.status).toBe(201);
+    }
+    expect(callbacksList).toHaveLength(1);
+
+    const put = await api("/config", {
+      method: "PUT",
+      body: JSON.stringify({ concurrency: 2 }),
+    });
+    expect(put.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(callbacksList).toHaveLength(2);
     });
   });
 });

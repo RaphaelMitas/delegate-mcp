@@ -9,7 +9,7 @@ Delegate agentic coding tasks from [Claude Code](https://claude.com/claude-code)
 Shelling out to a local-model CLI wrapper and watching a log file grow is fragile: when the local server queues or the model loops, all you see is silence. delegate-mcp fixes the two root causes:
 
 - **Event-level observability.** Jobs run in the harness's streaming-JSON mode (`claude -p --output-format stream-json`, `codex exec --json`, `opencode run --format json`), so the daemon sees every tool call and message as a structured event. "What is it doing right now?" is a status query, not log archaeology.
-- **One shared daemon.** All Claude Code sessions talk to a single local job daemon with a serial queue, matching local servers that process one request at a time. No more two sessions silently deadlocking the backend.
+- **One shared daemon.** All Claude Code sessions talk to a single local job daemon with one queue. It runs serially by default — matching local servers that process one request at a time — but `concurrency` can be raised to 4 for backends that handle parallel requests. No more two sessions silently deadlocking the backend.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ Claude Code session B ──┤                     Delegate.app (menu-bar UI)
                         ▼                        │  HTTP + SSE
                  delegate-mcp mcp ────►  daemon ─┘   127.0.0.1, token-protected
                  (thin client)             │
-                                           ├─ serial job queue (concurrency 1)
+                                           ├─ job queue (concurrency 1–4, serial by default)
                                            ├─ per job: spawns a headless harness
                                            │    (claude | codex | opencode)
                                            │    against the local backend

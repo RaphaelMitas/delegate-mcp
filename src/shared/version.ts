@@ -1,4 +1,4 @@
-export const VERSION = "0.2.2";
+export const VERSION = "0.2.3";
 
 /**
  * True when `a` is an older release than `b`. Non-numeric segments compare

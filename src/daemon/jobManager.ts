@@ -213,6 +213,11 @@ export class JobManager extends EventEmitter {
     return this.queue.length;
   }
 
+  /** Re-evaluate the queue, e.g. after the concurrency setting changed. */
+  kick(): void {
+    this.pump();
+  }
+
   shutdown(): void {
     for (const [jobId, running] of this.running) {
       running.killReason = "canceled";

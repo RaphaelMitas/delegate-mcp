@@ -36,6 +36,7 @@ export default function Settings({
     stallSeconds: 120,
     timeoutSeconds: 1800,
     maxTurns: 200,
+    concurrency: 1,
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -87,6 +88,8 @@ export default function Settings({
       if (config.timeoutSeconds !== undefined)
         patch.timeoutSeconds = config.timeoutSeconds;
       if (config.maxTurns !== undefined) patch.maxTurns = config.maxTurns;
+      if (config.concurrency !== undefined)
+        patch.concurrency = config.concurrency;
 
       await saveConfig(runtime, patch);
       setSuccess(true);
@@ -241,6 +244,29 @@ export default function Settings({
             onChange={(e) => handleChange("maxTurns", Number(e.target.value))}
           />
         </div>
+
+        <div className="form-row">
+          <label>Concurrent jobs</label>
+          <select
+            value={config.concurrency ?? 1}
+            onChange={(e) =>
+              handleChange("concurrency", Number(e.target.value))
+            }
+          >
+            {[1, 2, 3, 4].map((n) => (
+              <option key={n} value={n}>
+                {n === 1 ? "1 — serial (recommended for local backends)" : n}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(config.concurrency ?? 1) > 1 && (
+          <div className="warning">
+            Local backends often serialize requests anyway; parallel jobs share
+            the backend and may slow each other down
+          </div>
+        )}
 
         <div className="form-actions">
           <button type="button" onClick={onClose}>

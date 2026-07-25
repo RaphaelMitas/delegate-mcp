@@ -21,6 +21,7 @@ export interface DaemonFileConfig {
   stallSeconds?: number;
   timeoutSeconds?: number;
   maxTurns?: number;
+  concurrency?: number;
 }
 
 export interface DaemonConfigResponse {
@@ -36,6 +37,7 @@ export interface DaemonConfigResponse {
         | "stallSeconds"
         | "timeoutSeconds"
         | "maxTurns"
+        | "concurrency"
       >
     >;
 }
