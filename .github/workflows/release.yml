@@ -87,6 +87,10 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::error::APPLE_CERTIFICATE secret is not set (base64-encoded Developer ID Application .p12). See README release docs."
+            exit 1
+          fi
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
@@ -157,9 +161,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Homebrew tap
-        if: ${{ env.TAP_TOKEN != '' }}
+        # secrets (not step env) context: step-level env is not visible in its
+        # own `if`, so the previous env.TAP_TOKEN guard never fired.
+        if: ${{ secrets.TAP_DISPATCH_TOKEN != '' }}
         env:
-          TAP_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
           GH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
