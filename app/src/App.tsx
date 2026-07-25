@@ -164,13 +164,13 @@ export default function App() {
             : "LM Studio unreachable"}
         </span>
         <button
-          className="icon-btn"
-          aria-label="Settings"
+          className="icon-btn settings-toggle"
+          aria-label={view === "settings" ? "Close settings" : "Settings"}
           onClick={() =>
             setView((prev) => (prev === "jobs" ? "settings" : "jobs"))
           }
         >
-          ⚙
+          {view === "settings" ? "✕" : "⚙"}
         </button>
       </header>
 

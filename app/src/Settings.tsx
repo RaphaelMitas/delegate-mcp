@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchConfig,
+  fetchHealth,
   saveConfig,
   type DaemonFileConfig,
   type Harness,
@@ -38,6 +39,7 @@ export default function Settings({
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [backendModels, setBackendModels] = useState<string[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -46,6 +48,16 @@ export default function Settings({
         setConfig(result.effective);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+    void (async () => {
+      try {
+        const health = await fetchHealth(runtime);
+        setBackendModels(
+          health.backend.models.filter((m) => !m.includes("embed")),
+        );
+      } catch {
+        // Backend unreachable; fall back to the free-text model input.
       }
     })();
   }, [runtime]);
@@ -62,7 +74,9 @@ export default function Settings({
       // Build patch with only fields that have values set
       const patch: DaemonFileConfig = {};
       if (config.baseUrl !== "") patch.baseUrl = config.baseUrl;
-      if (config.model !== "") patch.model = config.model;
+      // Always send model: "" means "auto" and must be able to overwrite a
+      // previously saved explicit model.
+      patch.model = config.model ?? "";
       if (config.harness) patch.harness = config.harness;
       if (config.claudePath) patch.claudePath = config.claudePath;
       if (config.codexPath) patch.codexPath = config.codexPath;
@@ -95,9 +109,6 @@ export default function Settings({
     <div className="settings">
       <div className="settings-header">
         <h2>Settings</h2>
-        <button className="icon-btn" onClick={onClose} aria-label="Close">
-          ✕
-        </button>
       </div>
 
       {error !== null && (
@@ -123,12 +134,31 @@ export default function Settings({
 
         <div className="form-row">
           <label>Model</label>
-          <input
-            type="text"
-            placeholder="auto (first loaded model)"
-            value={config.model || ""}
-            onChange={(e) => handleChange("model", e.target.value)}
-          />
+          {backendModels.length > 0 ? (
+            <select
+              value={config.model || ""}
+              onChange={(e) => handleChange("model", e.target.value)}
+            >
+              <option value="">auto (first loaded model)</option>
+              {backendModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              {config.model && !backendModels.includes(config.model) ? (
+                <option value={config.model}>
+                  {config.model} (not loaded)
+                </option>
+              ) : null}
+            </select>
+          ) : (
+            <input
+              type="text"
+              placeholder="auto (first loaded model)"
+              value={config.model || ""}
+              onChange={(e) => handleChange("model", e.target.value)}
+            />
+          )}
         </div>
 
         <div className="form-row">
@@ -219,6 +249,8 @@ export default function Settings({
           <button type="submit">Save</button>
         </div>
       </form>
+
+      <div className="settings-version">delegate-mcp v{runtime.version}</div>
     </div>
   );
 }
