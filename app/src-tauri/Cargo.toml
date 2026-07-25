@@ -1,6 +1,6 @@
 [package]
 name = "delegate-app"
-version = "0.1.1"
+version = "0.1.2"
 description = "Menu-bar UI for the delegate-mcp local delegation daemon"
 authors = ["Raphael Mitas"]
 edition = "2021"

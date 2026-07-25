@@ -190,6 +190,37 @@ export async function runMcpServer(): Promise<void> {
   );
 
   server.registerTool(
+    "delegate_config",
+    {
+      description:
+        "Read or update daemon configuration (baseUrl, model, permissionMode, maxTurns, stallSeconds, timeoutSeconds, concurrency). Call with no arguments to read current settings. Pass fields to update them — only provided fields are changed, others are preserved. Changes are written to the config file and take effect immediately.",
+      inputSchema: {
+        baseUrl: z.string().url().optional().describe("Backend URL (e.g. http://127.0.0.1:1234)"),
+        model: z.string().optional().describe("Model id to use"),
+        permissionMode: z
+          .enum(["default", "acceptEdits", "plan", "bypassPermissions"])
+          .optional()
+          .describe("Permission mode for delegated agents"),
+        maxTurns: z.number().int().positive().optional().describe("Maximum tool-call turns per job"),
+        stallSeconds: z.number().int().positive().optional().describe("Seconds without an event before a job is killed as stalled"),
+        timeoutSeconds: z.number().int().positive().optional().describe("Wall-clock timeout per job in seconds"),
+        concurrency: z.number().int().min(1).max(4).optional().describe("Max concurrent jobs"),
+      },
+    },
+    async (args) => {
+      try {
+        const hasUpdates = Object.values(args).some((v) => v !== undefined);
+        if (hasUpdates) {
+          return jsonContent(await client.saveConfig(args));
+        }
+        return jsonContent(await client.getConfig());
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
     "delegate_health",
     {
       description:

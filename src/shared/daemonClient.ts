@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { readRuntimeInfo } from "../daemon/index.js";
 import { dataDir, daemonLogPath } from "./paths.js";
+import type { FileConfig } from "./config.js";
 import type {
   HealthResponse,
   JobRecord,
@@ -12,6 +13,13 @@ import type {
   RuntimeInfo,
   StartJobRequest,
 } from "./types.js";
+
+export interface ConfigResponse {
+  file: FileConfig;
+  effective: FileConfig & Required<Pick<FileConfig,
+    "baseUrl" | "model" | "permissionMode" | "stallSeconds" | "timeoutSeconds" | "maxTurns" | "concurrency"
+  >>;
+}
 
 export class DaemonClient {
   private runtime: RuntimeInfo | undefined;
@@ -146,6 +154,14 @@ export class DaemonClient {
       `/jobs/${encodeURIComponent(jobId)}/cancel`,
     );
     return job;
+  }
+
+  getConfig(): Promise<ConfigResponse> {
+    return this.request<ConfigResponse>("GET", "/config");
+  }
+
+  saveConfig(patch: FileConfig): Promise<ConfigResponse> {
+    return this.request<ConfigResponse>("PUT", "/config", patch);
   }
 }
 
