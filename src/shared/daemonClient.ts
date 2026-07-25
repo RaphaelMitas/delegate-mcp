@@ -16,9 +16,19 @@ import type {
 
 export interface ConfigResponse {
   file: FileConfig;
-  effective: FileConfig & Required<Pick<FileConfig,
-    "baseUrl" | "model" | "permissionMode" | "stallSeconds" | "timeoutSeconds" | "maxTurns" | "concurrency"
-  >>;
+  effective: FileConfig &
+    Required<
+      Pick<
+        FileConfig,
+        | "baseUrl"
+        | "model"
+        | "permissionMode"
+        | "stallSeconds"
+        | "timeoutSeconds"
+        | "maxTurns"
+        | "concurrency"
+      >
+    >;
 }
 
 export class DaemonClient {

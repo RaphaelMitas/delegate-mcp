@@ -2,13 +2,13 @@
 
 Delegate agentic coding tasks from [Claude Code](https://claude.com/claude-code) to a **free local model** — with real observability.
 
-`delegate-mcp` runs headless Claude Code sessions against any Anthropic-compatible endpoint (e.g. [LM Studio](https://lmstudio.ai) ≥ 0.4.1, which serves `/v1/messages` locally). Your expensive cloud agent orchestrates; your local model explores, edits, and fixes — and you can watch every tool call it makes, live.
+`delegate-mcp` runs headless coding-agent sessions — [Claude Code](https://claude.com/claude-code), [Codex CLI](https://github.com/openai/codex), or [OpenCode](https://opencode.ai) — against a local endpoint such as [LM Studio](https://lmstudio.ai) ≥ 0.4.1. Your expensive cloud agent orchestrates; your local model explores, edits, and fixes — and you can watch every tool call it makes, live. The harness is switchable per job, in Settings, or via the `delegate_config` MCP tool.
 
 ## Why
 
 Shelling out to a local-model CLI wrapper and watching a log file grow is fragile: when the local server queues or the model loops, all you see is silence. delegate-mcp fixes the two root causes:
 
-- **Event-level observability.** Jobs run as `claude -p --output-format stream-json`, so the daemon sees every tool call and message as a structured event. "What is it doing right now?" is a status query, not log archaeology.
+- **Event-level observability.** Jobs run in the harness's streaming-JSON mode (`claude -p --output-format stream-json`, `codex exec --json`, `opencode run --format json`), so the daemon sees every tool call and message as a structured event. "What is it doing right now?" is a status query, not log archaeology.
 - **One shared daemon.** All Claude Code sessions talk to a single local job daemon with a serial queue, matching local servers that process one request at a time. No more two sessions silently deadlocking the backend.
 
 ## Architecture
@@ -20,9 +20,10 @@ Claude Code session B ──┤                     Delegate.app (menu-bar UI)
                  delegate-mcp mcp ────►  daemon ─┘   127.0.0.1, token-protected
                  (thin client)             │
                                            ├─ serial job queue (concurrency 1)
-                                           ├─ per job: spawns headless claude
-                                           │    against ANTHROPIC_BASE_URL
-                                           ├─ stream-json parser → live activity
+                                           ├─ per job: spawns a headless harness
+                                           │    (claude | codex | opencode)
+                                           │    against the local backend
+                                           ├─ stream parser per harness → live activity
                                            ├─ stall detector (event-level) + timeout
                                            └─ jobs persisted to disk (ndjson event logs)
 ```
@@ -34,7 +35,17 @@ brew install raphaelmitas/tap/delegate-mcp          # CLI + daemon + MCP server
 brew install --cask raphaelmitas/tap/delegate       # optional menu-bar app
 ```
 
-Requires the [Claude Code CLI](https://claude.com/claude-code) (`claude`) on your PATH.
+Requires at least one harness CLI on your PATH: [Claude Code](https://claude.com/claude-code) (`claude`), [Codex CLI](https://github.com/openai/codex) (`codex`), or [OpenCode](https://opencode.ai) (`opencode`). The default harness is `claude`.
+
+### Harnesses
+
+| Harness    | CLI        | Backend wiring                                                                     |
+| ---------- | ---------- | ---------------------------------------------------------------------------------- |
+| `claude`   | `claude`   | Anthropic-compatible `/v1/messages` via `ANTHROPIC_BASE_URL`                       |
+| `codex`    | `codex`    | OpenAI Responses API (`/v1/responses`, needs LM Studio ≥ 0.4.x) via `-c` overrides |
+| `opencode` | `opencode` | OpenAI-compatible `/v1/chat/completions` via inline `OPENCODE_CONFIG_CONTENT`      |
+
+Switch the default in the app's Settings, with `delegate_config` (`{"harness": "codex"}`), or per job via `delegate_start`'s `harness` argument. `maxTurns` and `appendSystemPrompt` only apply to the `claude` harness.
 
 ### Set up with LM Studio
 
@@ -59,6 +70,7 @@ The daemon auto-starts on first use. No LM Studio? Point `DELEGATE_BASE_URL` at 
 | `delegate_logs`   | Raw stream-json event tail for deep debugging.                                                                        |
 | `delegate_cancel` | Cancel a queued or running job.                                                                                       |
 | `delegate_health` | Daemon + backend health: reachability, loaded models, queue depth.                                                    |
+| `delegate_config` | Read or update daemon config (harness, baseUrl, model, permissionMode, …) without touching files.                     |
 
 Job lifecycle: `queued → running → succeeded | failed | stalled | timeout | canceled`. A job is **stalled** when no stream event arrived for `stallSeconds` (default 120) — the daemon kills it and says so, instead of hanging forever.
 
@@ -84,7 +96,10 @@ Precedence: per-job tool arguments > environment variables > `~/.config/delegate
 | `authToken`      | `DELEGATE_AUTH_TOKEN`       | `lmstudio`                                    |
 | `model`          | `DELEGATE_MODEL`            | first non-embedding model the backend reports |
 | `smallFastModel` | `DELEGATE_SMALL_FAST_MODEL` | same as `model`                               |
+| `harness`        | `DELEGATE_HARNESS`          | `claude` (`claude` \| `codex` \| `opencode`)  |
 | `claudePath`     | `DELEGATE_CLAUDE_PATH`      | `claude`                                      |
+| `codexPath`      | `DELEGATE_CODEX_PATH`       | `codex`                                       |
+| `opencodePath`   | `DELEGATE_OPENCODE_PATH`    | `opencode`                                    |
 | `timeoutSeconds` | `DELEGATE_TIMEOUT_SECONDS`  | `1800`                                        |
 | `stallSeconds`   | `DELEGATE_STALL_SECONDS`    | `120`                                         |
 | `permissionMode` | `DELEGATE_PERMISSION_MODE`  | `acceptEdits`                                 |
@@ -103,7 +118,8 @@ Data lives in `~/Library/Application Support/delegate-mcp/`: `daemon.json` (port
 ## Troubleshooting
 
 - **Job stalled immediately** — the backend is probably busy or the model unloaded; check `delegate_health`, then LM Studio's server tab.
-- **`failed to spawn claude`** — the Claude Code CLI isn't on the daemon's PATH; set `claudePath` in config.
+- **`failed to spawn claude`/`codex`/`opencode`** — the harness CLI isn't on the daemon's PATH; set `claudePath`/`codexPath`/`opencodePath` in config.
+- **Codex jobs fail with a wire-API error** — Codex only speaks the OpenAI Responses API; make sure your LM Studio is new enough to serve `/v1/responses`.
 - **Model errors / empty results** — ensure the loaded model supports tool use and the context length is ≥ 64K (LM Studio defaults are often much lower).
 - **Everything looks stuck** — `delegate-mcp health`; the daemon log is at `~/Library/Application Support/delegate-mcp/daemon.log`.
 

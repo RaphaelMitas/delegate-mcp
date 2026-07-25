@@ -3,8 +3,19 @@ import {
   fetchConfig,
   saveConfig,
   type DaemonFileConfig,
+  type Harness,
   type RuntimeInfo,
 } from "./api";
+
+const HARNESSES: {
+  value: Harness;
+  label: string;
+  pathField: keyof DaemonFileConfig;
+}[] = [
+  { value: "claude", label: "Claude Code", pathField: "claudePath" },
+  { value: "codex", label: "Codex", pathField: "codexPath" },
+  { value: "opencode", label: "OpenCode", pathField: "opencodePath" },
+];
 
 export default function Settings({
   runtime,
@@ -16,6 +27,10 @@ export default function Settings({
   const [config, setConfig] = useState<DaemonFileConfig>({
     baseUrl: "",
     model: "",
+    harness: "claude",
+    claudePath: "",
+    codexPath: "",
+    opencodePath: "",
     permissionMode: "acceptEdits",
     stallSeconds: 120,
     timeoutSeconds: 1800,
@@ -48,6 +63,10 @@ export default function Settings({
       const patch: DaemonFileConfig = {};
       if (config.baseUrl !== "") patch.baseUrl = config.baseUrl;
       if (config.model !== "") patch.model = config.model;
+      if (config.harness) patch.harness = config.harness;
+      if (config.claudePath) patch.claudePath = config.claudePath;
+      if (config.codexPath) patch.codexPath = config.codexPath;
+      if (config.opencodePath) patch.opencodePath = config.opencodePath;
       if (config.permissionMode) patch.permissionMode = config.permissionMode;
       if (config.stallSeconds !== undefined)
         patch.stallSeconds = config.stallSeconds;
@@ -111,6 +130,34 @@ export default function Settings({
             onChange={(e) => handleChange("model", e.target.value)}
           />
         </div>
+
+        <div className="form-row">
+          <label>Harness</label>
+          <select
+            value={config.harness || "claude"}
+            onChange={(e) => handleChange("harness", e.target.value)}
+          >
+            {HARNESSES.map((h) => (
+              <option key={h.value} value={h.value}>
+                {h.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {HARNESSES.filter((h) => h.value === (config.harness || "claude")).map(
+          (h) => (
+            <div className="form-row" key={h.pathField}>
+              <label>{h.label} binary</label>
+              <input
+                type="text"
+                placeholder={h.value}
+                value={(config[h.pathField] as string) || ""}
+                onChange={(e) => handleChange(h.pathField, e.target.value)}
+              />
+            </div>
+          ),
+        )}
 
         <div className="form-row">
           <label>Permission mode</label>

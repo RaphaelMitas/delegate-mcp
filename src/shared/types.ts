@@ -29,6 +29,7 @@ export interface JobRecord {
   prompt: string;
   workdir: string;
   model: string;
+  harness: Harness;
   permissionMode: PermissionMode;
   timeoutSeconds: number;
   stallSeconds: number;
@@ -52,6 +53,7 @@ export interface JobSummary {
   promptPreview: string;
   workdir: string;
   model: string;
+  harness: Harness;
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
@@ -68,10 +70,14 @@ export interface JobSummary {
 export type PermissionMode =
   "default" | "acceptEdits" | "plan" | "bypassPermissions";
 
+/** Which coding-agent CLI executes delegated jobs. */
+export type Harness = "claude" | "codex" | "opencode";
+
 export interface StartJobRequest {
   prompt: string;
   workdir: string;
   model?: string;
+  harness?: Harness;
   timeoutSeconds?: number;
   stallSeconds?: number;
   permissionMode?: PermissionMode;

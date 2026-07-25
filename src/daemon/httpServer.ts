@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   fileConfigSchema,
+  harnessSchema,
   loadConfig,
   readConfigFile,
   saveConfigFile,
@@ -20,6 +21,7 @@ const startJobSchema = z.object({
   prompt: z.string().min(1),
   workdir: z.string().min(1),
   model: z.string().optional(),
+  harness: harnessSchema.optional(),
   timeoutSeconds: z.number().int().positive().optional(),
   stallSeconds: z.number().int().positive().optional(),
   permissionMode: z

@@ -33,7 +33,7 @@ export async function runMcpServer(): Promise<void> {
     "delegate_start",
     {
       description:
-        "Start a delegated agentic coding job on the local model (headless Claude Code against an Anthropic-compatible backend such as LM Studio). Returns immediately with a job id; poll delegate_status. The prompt must be fully self-contained: goal, relevant paths, constraints, and what 'done' looks like.",
+        "Start a delegated agentic coding job on the local model, run by a headless coding harness (Claude Code, Codex CLI, or OpenCode) against an OpenAI/Anthropic-compatible backend such as LM Studio. Returns immediately with a job id; poll delegate_status. The prompt must be fully self-contained: goal, relevant paths, constraints, and what 'done' looks like.",
       inputSchema: {
         prompt: z
           .string()
@@ -45,13 +45,27 @@ export async function runMcpServer(): Promise<void> {
           .string()
           .optional()
           .describe("Backend model id; defaults to configured/loaded model"),
+        harness: z
+          .enum(["claude", "codex", "opencode"])
+          .optional()
+          .describe(
+            "Coding-agent CLI to run this job with; defaults to the configured harness",
+          ),
         timeoutSeconds: z.number().int().positive().optional(),
         stallSeconds: z.number().int().positive().optional(),
         permissionMode: z
           .enum(["default", "acceptEdits", "plan", "bypassPermissions"])
           .optional(),
-        maxTurns: z.number().int().positive().optional(),
-        appendSystemPrompt: z.string().optional(),
+        maxTurns: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Claude harness only; codex/opencode ignore it"),
+        appendSystemPrompt: z
+          .string()
+          .optional()
+          .describe("Claude harness only; codex/opencode ignore it"),
       },
     },
     async (args) => {
@@ -193,18 +207,57 @@ export async function runMcpServer(): Promise<void> {
     "delegate_config",
     {
       description:
-        "Read or update daemon configuration (baseUrl, model, permissionMode, maxTurns, stallSeconds, timeoutSeconds, concurrency). Call with no arguments to read current settings. Pass fields to update them — only provided fields are changed, others are preserved. Changes are written to the config file and take effect immediately.",
+        "Read or update daemon configuration (harness, baseUrl, model, permissionMode, maxTurns, stallSeconds, timeoutSeconds, concurrency, harness binary paths). Call with no arguments to read current settings. Pass fields to update them — only provided fields are changed, others are preserved. Changes are written to the config file and take effect immediately.",
       inputSchema: {
-        baseUrl: z.string().url().optional().describe("Backend URL (e.g. http://127.0.0.1:1234)"),
+        baseUrl: z
+          .string()
+          .url()
+          .optional()
+          .describe("Backend URL (e.g. http://127.0.0.1:1234)"),
         model: z.string().optional().describe("Model id to use"),
+        harness: z
+          .enum(["claude", "codex", "opencode"])
+          .optional()
+          .describe(
+            "Default coding-agent CLI for delegated jobs: claude (Claude Code), codex (Codex CLI), or opencode (OpenCode)",
+          ),
+        claudePath: z.string().optional().describe("Path to the claude binary"),
+        codexPath: z.string().optional().describe("Path to the codex binary"),
+        opencodePath: z
+          .string()
+          .optional()
+          .describe("Path to the opencode binary"),
         permissionMode: z
           .enum(["default", "acceptEdits", "plan", "bypassPermissions"])
           .optional()
           .describe("Permission mode for delegated agents"),
-        maxTurns: z.number().int().positive().optional().describe("Maximum tool-call turns per job"),
-        stallSeconds: z.number().int().positive().optional().describe("Seconds without an event before a job is killed as stalled"),
-        timeoutSeconds: z.number().int().positive().optional().describe("Wall-clock timeout per job in seconds"),
-        concurrency: z.number().int().min(1).max(4).optional().describe("Max concurrent jobs"),
+        maxTurns: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Maximum tool-call turns per job"),
+        stallSeconds: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            "Seconds without an event before a job is killed as stalled",
+          ),
+        timeoutSeconds: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Wall-clock timeout per job in seconds"),
+        concurrency: z
+          .number()
+          .int()
+          .min(1)
+          .max(4)
+          .optional()
+          .describe("Max concurrent jobs"),
       },
     },
     async (args) => {

@@ -8,9 +8,15 @@ export interface RuntimeInfo {
   startedAt: string;
 }
 
+export type Harness = "claude" | "codex" | "opencode";
+
 export interface DaemonFileConfig {
   baseUrl?: string;
   model?: string;
+  harness?: Harness;
+  claudePath?: string;
+  codexPath?: string;
+  opencodePath?: string;
   permissionMode?: "default" | "acceptEdits" | "plan" | "bypassPermissions";
   stallSeconds?: number;
   timeoutSeconds?: number;
@@ -25,6 +31,7 @@ export interface DaemonConfigResponse {
         DaemonFileConfig,
         | "baseUrl"
         | "model"
+        | "harness"
         | "permissionMode"
         | "stallSeconds"
         | "timeoutSeconds"
@@ -68,6 +75,7 @@ export interface JobSummary {
   promptPreview: string;
   workdir: string;
   model: string;
+  harness?: Harness;
   createdAt: string;
   startedAt?: string;
   endedAt?: string;

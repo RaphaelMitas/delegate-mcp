@@ -14,7 +14,7 @@ import type {
 } from "../shared/types.js";
 import { resolveModel as defaultResolveModel } from "./backend.js";
 import {
-  startClaudeProcess as defaultStartProcess,
+  startHarnessProcess as defaultStartProcess,
   type RunningProcess,
   type RunnerCallbacks,
 } from "./runner.js";
@@ -74,7 +74,11 @@ export class JobManager extends EventEmitter {
           path.join(jobsDir(), entry, "job.json"),
           "utf8",
         );
-        records.push(JSON.parse(raw) as JobRecord);
+        // Jobs persisted before multi-harness support have no harness field.
+        const record = JSON.parse(raw) as Omit<JobRecord, "harness"> & {
+          harness?: JobRecord["harness"];
+        };
+        records.push({ harness: "claude", ...record });
       } catch {
         continue;
       }
@@ -104,6 +108,7 @@ export class JobManager extends EventEmitter {
       prompt: request.prompt,
       workdir: request.workdir,
       model,
+      harness: request.harness ?? this.config.harness,
       permissionMode: request.permissionMode ?? this.config.permissionMode,
       timeoutSeconds: request.timeoutSeconds ?? this.config.timeoutSeconds,
       stallSeconds: request.stallSeconds ?? this.config.stallSeconds,
@@ -161,6 +166,7 @@ export class JobManager extends EventEmitter {
         job.prompt.length > 200 ? `${job.prompt.slice(0, 200)}…` : job.prompt,
       workdir: job.workdir,
       model: job.model,
+      harness: job.harness,
       createdAt: job.createdAt,
       turns: job.turns,
     };
@@ -275,7 +281,7 @@ export class JobManager extends EventEmitter {
           this.finalize(
             job,
             "failed",
-            `claude exited with ${signal ?? `code ${code ?? "unknown"}`}${
+            `${job.harness} exited with ${signal ?? `code ${code ?? "unknown"}`}${
               stderrTail !== "" ? `; stderr: ${stderrTail.slice(-1000)}` : ""
             }`,
           );
@@ -289,7 +295,7 @@ export class JobManager extends EventEmitter {
         this.finalize(
           job,
           "failed",
-          `failed to spawn claude: ${error.message}`,
+          `failed to spawn ${job.harness}: ${error.message}`,
         );
         this.pump();
       },

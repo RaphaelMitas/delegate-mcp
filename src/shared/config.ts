@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import { configFilePath } from "./paths.js";
-import type { PermissionMode } from "./types.js";
+import type { Harness, PermissionMode } from "./types.js";
 
 const permissionModeSchema = z.enum([
   "default",
@@ -12,13 +12,18 @@ const permissionModeSchema = z.enum([
   "bypassPermissions",
 ]);
 
+export const harnessSchema = z.enum(["claude", "codex", "opencode"]);
+
 const fileConfigSchema = z
   .object({
     baseUrl: z.string().url(),
     authToken: z.string(),
     model: z.string(),
     smallFastModel: z.string(),
+    harness: harnessSchema,
     claudePath: z.string(),
+    codexPath: z.string(),
+    opencodePath: z.string(),
     port: z.number().int().min(0).max(65535),
     timeoutSeconds: z.number().int().positive(),
     stallSeconds: z.number().int().positive(),
@@ -38,7 +43,11 @@ export interface DelegateConfig {
   /** Empty string means "resolve from the backend's model list at job start". */
   model: string;
   smallFastModel: string;
+  /** Which coding-agent CLI runs delegated jobs. */
+  harness: Harness;
   claudePath: string;
+  codexPath: string;
+  opencodePath: string;
   /** 0 means "pick a free port". */
   port: number;
   timeoutSeconds: number;
@@ -53,7 +62,10 @@ export const CONFIG_DEFAULTS: DelegateConfig = {
   authToken: "lmstudio",
   model: "",
   smallFastModel: "",
+  harness: "claude",
   claudePath: "claude",
+  codexPath: "codex",
+  opencodePath: "opencode",
   port: 0,
   timeoutSeconds: 1800,
   stallSeconds: 120,
@@ -103,6 +115,18 @@ function envInt(env: NodeJS.ProcessEnv, key: string): number | undefined {
     );
   }
   return parsed;
+}
+
+function envHarness(env: NodeJS.ProcessEnv, key: string): Harness | undefined {
+  const value = envString(env, key);
+  if (value === undefined) return undefined;
+  const result = harnessSchema.safeParse(value);
+  if (!result.success) {
+    throw new Error(
+      `Environment variable ${key} must be one of ${harnessSchema.options.join(", ")}, got "${value}"`,
+    );
+  }
+  return result.data;
 }
 
 function envPermissionMode(
@@ -175,10 +199,22 @@ export function loadConfig(
       envString(env, "DELEGATE_SMALL_FAST_MODEL") ??
       file.smallFastModel ??
       CONFIG_DEFAULTS.smallFastModel,
+    harness:
+      envHarness(env, "DELEGATE_HARNESS") ??
+      file.harness ??
+      CONFIG_DEFAULTS.harness,
     claudePath:
       envString(env, "DELEGATE_CLAUDE_PATH") ??
       file.claudePath ??
       CONFIG_DEFAULTS.claudePath,
+    codexPath:
+      envString(env, "DELEGATE_CODEX_PATH") ??
+      file.codexPath ??
+      CONFIG_DEFAULTS.codexPath,
+    opencodePath:
+      envString(env, "DELEGATE_OPENCODE_PATH") ??
+      file.opencodePath ??
+      CONFIG_DEFAULTS.opencodePath,
     port: envInt(env, "DELEGATE_PORT") ?? file.port ?? CONFIG_DEFAULTS.port,
     timeoutSeconds:
       envInt(env, "DELEGATE_TIMEOUT_SECONDS") ??

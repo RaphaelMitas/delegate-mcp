@@ -278,7 +278,8 @@ function JobDetail({
       </div>
       <div className="detail-meta">
         <div>
-          <b>{shortPath(job.workdir)}</b> · {job.model} · {job.turns} tool calls
+          <b>{shortPath(job.workdir)}</b> · {job.harness ?? "claude"} ·{" "}
+          {job.model} · {job.turns} tool calls
         </div>
         {job.secondsSinceLastEvent !== undefined && active ? (
           <div>last event {job.secondsSinceLastEvent}s ago</div>
