@@ -3,6 +3,8 @@ import path from "node:path";
 import { startDaemon } from "../daemon/index.js";
 import { runMcpServer } from "../mcp/server.js";
 import { DaemonClient } from "../shared/daemonClient.js";
+import { installSkill, uninstallSkill } from "../shared/skill.js";
+import type { Harness } from "../shared/types.js";
 import { VERSION } from "../shared/version.js";
 
 const HELP = `delegate-mcp ${VERSION} — delegate agentic coding tasks to a local model
@@ -16,6 +18,10 @@ Usage:
   delegate-mcp logs <jobId> [n]    Tail a job's raw stream-json events
   delegate-mcp cancel <jobId>      Cancel a queued or running job
   delegate-mcp health              Daemon + backend health
+  delegate-mcp install-skill [harness...]
+                                   Install the delegation skill (default: all harnesses)
+  delegate-mcp uninstall-skill [harness...]
+                                   Remove the delegation skill
   delegate-mcp version             Print version
 
 Register with Claude Code:
@@ -72,6 +78,29 @@ async function main(): Promise<void> {
     case "health":
       console.log(JSON.stringify(await client.health(), null, 2));
       return;
+    case "install-skill": {
+      const harnesses = rest.length > 0 ? (rest as Harness[]) : undefined;
+      const results = installSkill(harnesses);
+      for (const r of results) {
+        console.log(`  ${r.harness}: ${r.path}`);
+      }
+      console.log(
+        "Sessions will now be nudged to delegate self-contained subtasks to the local model.",
+      );
+      return;
+    }
+    case "uninstall-skill": {
+      const harnesses = rest.length > 0 ? (rest as Harness[]) : undefined;
+      const results = uninstallSkill(harnesses);
+      if (results.length === 0) {
+        console.log("No skills found to remove.");
+      } else {
+        for (const r of results) {
+          console.log(`  removed ${r.harness}: ${r.path}`);
+        }
+      }
+      return;
+    }
     case "version":
       console.log(VERSION);
       return;

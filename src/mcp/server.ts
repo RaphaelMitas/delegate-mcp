@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { DaemonClient } from "../shared/daemonClient.js";
+import { installSkill, uninstallSkill } from "../shared/skill.js";
 import { VERSION } from "../shared/version.js";
 
 function jsonContent(value: unknown): {
@@ -27,13 +28,19 @@ function errorContent(err: unknown): {
 
 export async function runMcpServer(): Promise<void> {
   const client = new DaemonClient();
-  const server = new McpServer({ name: "delegate-mcp", version: VERSION });
+  const server = new McpServer(
+    { name: "delegate-mcp", version: VERSION },
+    {
+      instructions:
+        "delegate-mcp runs a FREE local coding agent on this machine. Proactively offload self-contained subtasks to it instead of doing them inline: implementation from a clear spec, mechanical refactors, bulk edits, test writing, boilerplate, isolated bug fixes, docs. Delegated jobs run in parallel with your own work at zero cost. Keep judgment work (design, ambiguous specs, final review) yourself, write fully self-contained prompts (the delegate shares none of your context), and always verify delegated results by reading the diff and running tests before presenting them as done.",
+    },
+  );
 
   server.registerTool(
     "delegate_start",
     {
       description:
-        "Start a delegated agentic coding job on the local model, run by a headless coding harness (Claude Code, Codex CLI, or OpenCode) against an OpenAI/Anthropic-compatible backend such as LM Studio. Returns immediately with a job id; poll delegate_status. The prompt must be fully self-contained: goal, relevant paths, constraints, and what 'done' looks like.",
+        "Delegate a self-contained coding subtask to a FREE local model (headless Claude Code, Codex CLI, or OpenCode against a local backend such as LM Studio). Use proactively for independent, well-specified, verifiable work — bulk edits, tests, boilerplate, mechanical refactors, isolated fixes — instead of doing it yourself; jobs run in parallel with your own work at zero cost. Returns immediately with a job id; poll delegate_status and verify the result yourself. The prompt must be fully self-contained: goal, relevant paths, constraints, and what 'done' looks like (the delegate shares none of your context).",
       inputSchema: {
         prompt: z
           .string()
@@ -283,6 +290,39 @@ export async function runMcpServer(): Promise<void> {
     async () => {
       try {
         return jsonContent(await client.health());
+      } catch (err) {
+        return errorContent(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "delegate_install_skill",
+    {
+      description:
+        "Install (or uninstall) the delegation skill so the coding agent proactively delegates subtasks to the free local model. Supports Claude Code, Codex CLI, and OpenCode. By default installs for all harnesses; pass specific harnesses to limit scope.",
+      inputSchema: {
+        harnesses: z
+          .array(z.enum(["claude", "codex", "opencode"]))
+          .optional()
+          .describe(
+            "Which harnesses to install for; defaults to all three",
+          ),
+        uninstall: z
+          .boolean()
+          .optional()
+          .describe("Set to true to remove the skill instead of installing it"),
+      },
+    },
+    ({ harnesses, uninstall }) => {
+      try {
+        const results = uninstall
+          ? uninstallSkill(harnesses)
+          : installSkill(harnesses);
+        return jsonContent({
+          action: uninstall ? "uninstalled" : "installed",
+          skills: results,
+        });
       } catch (err) {
         return errorContent(err);
       }

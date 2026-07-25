@@ -71,6 +71,7 @@ The daemon auto-starts on first use. No LM Studio? Point `DELEGATE_BASE_URL` at 
 | `delegate_cancel` | Cancel a queued or running job.                                                                                       |
 | `delegate_health` | Daemon + backend health: reachability, loaded models, queue depth.                                                    |
 | `delegate_config` | Read or update daemon config (harness, baseUrl, model, permissionMode, …) without touching files.                     |
+| `delegate_install_skill` | Install the delegation skill for Claude Code, Codex CLI, and/or OpenCode so agents proactively delegate.  |
 
 Job lifecycle: `queued → running → succeeded | failed | stalled | timeout | canceled`. A job is **stalled** when no stream event arrived for `stallSeconds` (default 120) — the daemon kills it and says so, instead of hanging forever.
 
@@ -84,6 +85,10 @@ delegate-mcp status [jobId]      Inspect jobs
 delegate-mcp logs <jobId> [n]    Raw event log tail
 delegate-mcp cancel <jobId>      Cancel a job
 delegate-mcp health              Daemon + backend health
+delegate-mcp install-skill [harness...]
+                                 Install the delegation skill (all harnesses by default)
+delegate-mcp uninstall-skill [harness...]
+                                 Remove the delegation skill
 ```
 
 ## Configuration
