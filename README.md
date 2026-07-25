@@ -109,6 +109,8 @@ Precedence: per-job tool arguments > environment variables > `~/.config/delegate
 
 `permissionMode: "bypassPermissions"` lets the local agent run shell commands unprompted — useful for real delegation on repos you trust, but understand what that means before enabling it.
 
+**Self-healing after upgrades:** the daemon is a long-lived process, so a `brew upgrade` alone leaves the old version running. Both the MCP client and the menu-bar app detect an older daemon and restart it automatically — but only when it is idle (no active or queued jobs; the daemon answers `409` to `POST /shutdown` otherwise, and the old version keeps serving until the next opportunity).
+
 Data lives in `~/Library/Application Support/delegate-mcp/`: `daemon.json` (port + auth token, mode 600), `daemon.log`, and `jobs/<id>/` with `prompt.txt`, `events.ndjson`, `job.json`, `result.json`.
 
 ## Menu-bar app

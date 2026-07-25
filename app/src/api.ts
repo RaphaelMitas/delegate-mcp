@@ -157,6 +157,15 @@ export async function fetchLogs(
   return response.text();
 }
 
+/** Ask the daemon to exit; it refuses with 409 while jobs are active. */
+export async function shutdownDaemon(runtime: RuntimeInfo): Promise<boolean> {
+  const response = await fetch(`${base(runtime)}/shutdown`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${runtime.token}` },
+  });
+  return response.ok;
+}
+
 export async function cancelJob(
   runtime: RuntimeInfo,
   jobId: string,

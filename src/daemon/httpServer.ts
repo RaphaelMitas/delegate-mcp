@@ -37,6 +37,8 @@ export interface DaemonHttpServerOptions {
   token: string;
   version: string;
   startedAt: string;
+  /** Called after a successful POST /shutdown; should exit the process. */
+  onShutdown?: () => void;
 }
 
 function sendJson(
@@ -65,7 +67,7 @@ async function readBody(req: http.IncomingMessage): Promise<unknown> {
 export function createDaemonServer(
   options: DaemonHttpServerOptions,
 ): http.Server {
-  const { config, manager, token, version, startedAt } = options;
+  const { config, manager, token, version, startedAt, onShutdown } = options;
   const sseClients = new Set<http.ServerResponse>();
 
   manager.on("event", (event: ServerEvent) => {
@@ -205,6 +207,19 @@ export function createDaemonServer(
         sendJson(res, 200, { job: manager.toSummary(job) });
         return;
       }
+    }
+
+    if (method === "POST" && url.pathname === "/shutdown") {
+      if (manager.activeJobId() !== undefined || manager.queueDepth() > 0) {
+        sendJson(res, 409, {
+          error: "daemon is busy (active or queued jobs); not shutting down",
+        });
+        return;
+      }
+      sendJson(res, 200, { ok: true });
+      // Let the response flush before the process exits.
+      setTimeout(() => onShutdown?.(), 150).unref();
+      return;
     }
 
     if (method === "GET" && url.pathname === "/events") {

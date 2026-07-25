@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 
 import {
   cancelJob,
@@ -9,6 +10,7 @@ import {
   fetchLogs,
   getRuntime,
   setTrayStatus,
+  shutdownDaemon,
   spawnDaemon,
   subscribeEvents,
   type HealthResponse,
@@ -39,6 +41,17 @@ function relativeTime(iso: string): string {
 function shortPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
   return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
+}
+
+function isVersionOlder(a: string, b: string): boolean {
+  const pa = a.split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const pb = b.split(".").map((s) => Number.parseInt(s, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const da = pa[i] ?? 0;
+    const db = pb[i] ?? 0;
+    if (da !== db) return da < db;
+  }
+  return false;
 }
 
 export default function App() {
@@ -124,6 +137,28 @@ export default function App() {
       unsubscribe();
     };
   }, [runtime, refreshRuntime]);
+
+  // Self-healing: when the daemon is an older release than this app (e.g.
+  // after a brew upgrade) and idle, restart it so the new binary takes over.
+  // One attempt per app session so a refusal can't loop.
+  const healAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!runtime || !health || healAttemptedRef.current) return;
+    if (health.activeJobId !== undefined || health.queueDepth > 0) return;
+    void (async () => {
+      const appVersion = await getVersion();
+      if (!isVersionOlder(health.version, appVersion)) return;
+      healAttemptedRef.current = true;
+      try {
+        if (await shutdownDaemon(runtime)) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await refreshRuntime();
+        }
+      } catch {
+        // The old daemon keeps serving; nothing to clean up.
+      }
+    })();
+  }, [runtime, health, refreshRuntime]);
 
   useEffect(() => {
     if (!runtime || selectedId === null) {

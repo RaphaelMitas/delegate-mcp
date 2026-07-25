@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { readRuntimeInfo } from "../daemon/index.js";
 import { dataDir, daemonLogPath } from "./paths.js";
+import { isVersionOlder, VERSION } from "./version.js";
 import type { FileConfig } from "./config.js";
 import type {
   HealthResponse,
@@ -72,11 +73,13 @@ export class DaemonClient {
   }
 
   async ensureDaemon(): Promise<RuntimeInfo> {
-    if (this.runtime && (await this.isLive(this.runtime))) return this.runtime;
+    if (this.runtime && (await this.isLive(this.runtime))) {
+      return (await this.healIfOutdated(this.runtime)) ?? this.runtime;
+    }
     const existing = readRuntimeInfo();
     if (existing && (await this.isLive(existing))) {
       this.runtime = existing;
-      return existing;
+      return (await this.healIfOutdated(existing)) ?? existing;
     }
     await this.spawnDaemon();
     const deadline = Date.now() + 15000;
@@ -91,6 +94,49 @@ export class DaemonClient {
     throw new Error(
       `delegate-mcp daemon did not become healthy within 15s; check ${daemonLogPath()}`,
     );
+  }
+
+  /**
+   * Self-healing: when the running daemon is an older release than this
+   * client (typical after a brew upgrade), ask it to shut down and spawn a
+   * fresh one. The daemon refuses (409) while jobs are active or queued, in
+   * which case the old daemon keeps serving. Attempted at most once per
+   * client so a refusal can't loop.
+   */
+  private healAttempted = false;
+
+  private async healIfOutdated(
+    info: RuntimeInfo,
+  ): Promise<RuntimeInfo | undefined> {
+    if (this.healAttempted) return undefined;
+    if (!isVersionOlder(info.version, VERSION)) return undefined;
+    this.healAttempted = true;
+    try {
+      const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${info.token}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return undefined;
+    } catch {
+      return undefined;
+    }
+    const gone = Date.now() + 5000;
+    while (Date.now() < gone && (await this.isLive(info))) {
+      await delay(200);
+    }
+    this.runtime = undefined;
+    await this.spawnDaemon();
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      await delay(250);
+      const fresh = readRuntimeInfo();
+      if (fresh && fresh.pid !== info.pid && (await this.isLive(fresh))) {
+        this.runtime = fresh;
+        return fresh;
+      }
+    }
+    return undefined;
   }
 
   private async isLive(info: RuntimeInfo): Promise<boolean> {

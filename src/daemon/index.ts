@@ -66,6 +66,9 @@ export async function startDaemon(): Promise<void> {
     token,
     version: VERSION,
     startedAt,
+    onShutdown: () => {
+      shutdown();
+    },
   });
   const port = await listen(server, config.port);
 

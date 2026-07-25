@@ -1,6 +1,6 @@
 {
   "name": "delegate-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Delegate agentic coding tasks from Claude Code to a local model via a switchable harness (Claude Code, Codex CLI, or OpenCode) against LM Studio or any compatible endpoint, with an observable local job daemon, MCP tools, and a menu-bar UI.",
   "license": "MIT",
   "repository": {

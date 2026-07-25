@@ -19,6 +19,7 @@ let workdir: string;
 let server: http.Server;
 let baseUrl: string;
 let callbacksList: RunnerCallbacks[];
+let shutdownSpy: ReturnType<typeof vi.fn>;
 
 function api(pathname: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${baseUrl}${pathname}`, {
@@ -48,12 +49,14 @@ beforeEach(async () => {
       },
     },
   );
+  shutdownSpy = vi.fn();
   server = createDaemonServer({
     config: { ...CONFIG_DEFAULTS, model: "test-model" },
     manager,
     token: TOKEN,
     version: "0.0.0-test",
     startedAt: new Date().toISOString(),
+    onShutdown: shutdownSpy,
   });
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", resolve);
@@ -212,5 +215,38 @@ describe("daemon HTTP API", () => {
       });
       expect(response.status).toBe(400);
     });
+  });
+});
+
+describe("POST /shutdown", () => {
+  it("accepts when idle and invokes the shutdown callback", async () => {
+    const response = await api("/shutdown", { method: "POST" });
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(shutdownSpy).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("refuses with 409 while a job is running", async () => {
+    const start = await api("/jobs", {
+      method: "POST",
+      body: JSON.stringify({ prompt: "run forever", workdir }),
+    });
+    expect(start.status).toBe(201);
+    const response = await api("/shutdown", { method: "POST" });
+    expect(response.status).toBe(409);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(shutdownSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("isVersionOlder", () => {
+  it("compares release versions numerically", async () => {
+    const { isVersionOlder } = await import("../src/shared/version.js");
+    expect(isVersionOlder("0.1.1", "0.2.1")).toBe(true);
+    expect(isVersionOlder("0.2.1", "0.2.1")).toBe(false);
+    expect(isVersionOlder("0.10.0", "0.9.0")).toBe(false);
+    expect(isVersionOlder("0.2", "0.2.1")).toBe(true);
+    expect(isVersionOlder("garbage", "0.2.1")).toBe(true);
   });
 });
