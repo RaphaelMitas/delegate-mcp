@@ -144,6 +144,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # Job-level so the tap-dispatch step can guard on it: neither `secrets`
+      # nor a step's own `env` are usable in a step-level `if`.
+      TAP_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -161,9 +165,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Homebrew tap
-        # secrets (not step env) context: step-level env is not visible in its
-        # own `if`, so the previous env.TAP_TOKEN guard never fired.
-        if: ${{ secrets.TAP_DISPATCH_TOKEN != '' }}
+        if: ${{ env.TAP_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
