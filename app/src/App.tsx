@@ -9,6 +9,7 @@ import {
   fetchJobs,
   fetchLogs,
   getRuntime,
+  isMock,
   setTrayStatus,
   shutdownDaemon,
   spawnDaemon,
@@ -18,6 +19,13 @@ import {
   type JobSummary,
   type RuntimeInfo,
 } from "./api.ts";
+
+import {
+  MOCK_RUNTIME,
+  MOCK_HEALTH,
+  MOCK_JOBS,
+  MOCK_JOB_DETAIL,
+} from "./mock.ts";
 
 import Settings from "./Settings.tsx";
 
@@ -67,6 +75,12 @@ export default function App() {
   selectedRef.current = selectedId;
 
   const refreshRuntime = useCallback(async () => {
+    if (isMock) {
+      setRuntime(MOCK_RUNTIME);
+      setHealth(MOCK_HEALTH);
+      setJobs(MOCK_JOBS);
+      return;
+    }
     try {
       let info = await getRuntime();
       if (info === null) {
@@ -88,7 +102,7 @@ export default function App() {
   }, [refreshRuntime]);
 
   useEffect(() => {
-    if (!runtime) return;
+    if (!runtime || isMock) return;
     let stale = false;
 
     const poll = async () => {
@@ -143,7 +157,7 @@ export default function App() {
   // One attempt per app session so a refusal can't loop.
   const healAttemptedRef = useRef(false);
   useEffect(() => {
-    if (!runtime || !health || healAttemptedRef.current) return;
+    if (!runtime || !health || healAttemptedRef.current || isMock) return;
     if (health.activeJobId !== undefined || health.queueDepth > 0) return;
     void (async () => {
       const appVersion = await getVersion();
@@ -163,6 +177,11 @@ export default function App() {
   useEffect(() => {
     if (!runtime || selectedId === null) {
       setDetail(null);
+      setLogs(null);
+      return;
+    }
+    if (isMock) {
+      setDetail({ ...MOCK_JOB_DETAIL, id: selectedId });
       setLogs(null);
       return;
     }

@@ -2,6 +2,14 @@
 
 Delegate agentic coding tasks from [Claude Code](https://claude.com/claude-code) to a **free local model** — with real observability.
 
+<p align="center">
+  <img src="docs/job-list.png" width="260" alt="Job list" />
+  &nbsp;&nbsp;
+  <img src="docs/job-detail.png" width="260" alt="Job detail" />
+  &nbsp;&nbsp;
+  <img src="docs/settings.png" width="260" alt="Settings" />
+</p>
+
 `delegate-mcp` runs headless coding-agent sessions — [Claude Code](https://claude.com/claude-code), [Codex CLI](https://github.com/openai/codex), or [OpenCode](https://opencode.ai) — against a local endpoint such as [LM Studio](https://lmstudio.ai) ≥ 0.4.1. Your expensive cloud agent orchestrates; your local model explores, edits, and fixes — and you can watch every tool call it makes, live. The harness is switchable per job, in Settings, or via the `delegate_config` MCP tool.
 
 ## Why

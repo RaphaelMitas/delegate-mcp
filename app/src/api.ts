@@ -1,4 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
+const isTauri = "__TAURI_INTERNALS__" in window;
+export const isMock = new URLSearchParams(window.location.search).has("mock");
+
+async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<T>(cmd, args);
+}
 
 export interface RuntimeInfo {
   port: number;
@@ -103,16 +109,32 @@ export interface JobRecord extends Omit<JobSummary, "promptPreview"> {
   };
 }
 
-export function getRuntime(): Promise<RuntimeInfo | null> {
-  return invoke<RuntimeInfo | null>("get_daemon_runtime");
+export async function getRuntime(): Promise<RuntimeInfo | null> {
+  if (isTauri) return tauriInvoke<RuntimeInfo | null>("get_daemon_runtime");
+  const params = new URLSearchParams(window.location.search);
+  const port = params.get("port");
+  const token = params.get("token");
+  if (!port || !token) return null;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/health`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const h = (await res.json()) as HealthResponse & { pid: number; startedAt: string };
+    return { port: Number(port), token, pid: h.pid, version: h.version, startedAt: h.startedAt };
+  } catch {
+    return null;
+  }
 }
 
-export function spawnDaemon(): Promise<string> {
-  return invoke<string>("spawn_daemon");
+export async function spawnDaemon(): Promise<string> {
+  if (isTauri) return tauriInvoke<string>("spawn_daemon");
+  throw new Error("Cannot spawn daemon from browser — start it manually: delegate-mcp daemon");
 }
 
-export function setTrayStatus(status: string): Promise<void> {
-  return invoke("set_tray_status", { status });
+export async function setTrayStatus(status: string): Promise<void> {
+  if (isTauri) return tauriInvoke("set_tray_status", { status });
+  void status;
 }
 
 function base(runtime: RuntimeInfo): string {

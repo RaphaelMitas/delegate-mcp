@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   fetchConfig,
   fetchHealth,
+  isMock,
   saveConfig,
   type DaemonFileConfig,
   type Harness,
   type RuntimeInfo,
 } from "./api";
+
+import { MOCK_CONFIG, MOCK_HEALTH } from "./mock";
 
 const HARNESSES: {
   value: Harness;
@@ -43,6 +46,13 @@ export default function Settings({
   const [backendModels, setBackendModels] = useState<string[]>([]);
 
   useEffect(() => {
+    if (isMock) {
+      setConfig(MOCK_CONFIG.effective);
+      setBackendModels(
+        MOCK_HEALTH.backend.models.filter((m) => !m.includes("embed")),
+      );
+      return;
+    }
     void (async () => {
       try {
         const result = await fetchConfig(runtime);
